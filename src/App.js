@@ -1,7 +1,11 @@
 import React from 'react'
 import Blog from './components/Blog'
 import Notification from './components/Notification'
+import LoginForm from './components/LoginForm'
+import BlogForm from './components/BlogForm.js'
+import Togglable from './components/Togglable'
 import blogService from './services/blogs'
+import loginService from './services/login'
 
 
 class App extends React.Component {
@@ -18,17 +22,24 @@ class App extends React.Component {
   }
 
   componentDidMount() {
-    blogService.getAll().then(blogs =>
+    blogService
+    .getAll()
+    .then(blogs => {
       this.setState({ blogs })
-    )
-  } 
+    })
+    
+    const loggedUserJSON = window.localStorage.getItem('loggedBlogappUser')
+    if (loggedUserJSON) {
+      const user = JSON.parse(loggedUserJSON)
+      this.setState({ user })
+      blogService.setToken(user.token)
+    } 
+  }
 
   addBlog = (event) => {
     event.preventDefault()
     const blogObject = {
-      content: this.state.newBlog,
-      date: new Date(),
-      important: Math.random() > 0.5
+      blogs: this.state.newBlog
     }
 
     blogService
@@ -41,53 +52,69 @@ class App extends React.Component {
       })
   }
 
-  handlePasswordChange = (event) => {
-    this.setState({ password: event.target.value })
+  handleLoginFieldChange = (event) => {
+    this.setState({ [event.target.name]: event.target.value })
   }
 
-  handleUsernameChange = (event) => {
-    this.setState({ username: event.target.value })
+  login = async (event) => {
+    event.preventDefault()
+    try {
+      const user = await loginService.login({
+        username: this.state.username,
+        password: this.state.password
+      })
+
+      window.localStorage.setItem('loggedBlogappUser', JSON.stringify(user))
+      blogService.setToken(user.token)
+      this.setState({ username: '', password: '', user })
+    } catch (exception) {
+      this.setState({
+        error: 'käyttäjätunnus tai salasana virheellinen',
+      })
+      setTimeout(() => {
+        this.setState({ error: null })
+      }, 5000)
+    }
   }
+
 
   render() {
+
+    const loginForm = () => (
+      <Togglable buttonLabel="login">
+        <LoginForm
+          visible={this.state.visible}
+          username={this.state.username}
+          password={this.state.password}
+          handleChange={this.handleLoginFieldChange}
+          handleSubmit={this.login}
+        />
+      </Togglable>
+    )
+
+    const blogForm = () => (
+      <Togglable buttonLabel="new blog" ref={component => this.blogForm = component}>
+        <BlogForm
+          onSubmit={this.addBlog}
+          value={this.state.newBlog}
+          handleChange={this.handleBlogChange}
+        />
+      </Togglable>
+    )
+
     return (
       <div>
         <h2>blogs</h2>
 
-        <Notification message={this.state.error} />
+        <Notification message={this.state.error}/>
 
-        <h2>Kirjaudu</h2>
-
-        <form onSubmit={this.login}>
+        {this.state.user === null ?
+          loginForm() :
           <div>
-            käyttäjätunnus
-            <input
-              type="text"
-              value={this.state.username}
-              onChange={this.handleUsernameChange}
-            />
+            <p>{this.state.user.name} logged in</p>
+            {blogForm()}
           </div>
-          <div>
-            salasana
-            <input
-              type="password"
-              value={this.state.password}
-              onChange={this.handlePasswordChange}
-            />
-          </div>
-          <button type="submit">kirjaudu</button>
-        </form>
-
-        <h2>Luo uusi blog</h2>
-
-        <form onSubmit={this.addBlog}>
-          <input
-            value={this.state.newBlog}
-            onChange={this.handleNoteChange}
-          />
-        <button type="submit">tallenna</button>
-        </form>
-
+        }
 
         {this.state.blogs.map(blog => 
           <Blog key={blog._id} blog={blog}/>
