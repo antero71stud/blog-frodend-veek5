@@ -15,6 +15,7 @@ class App extends React.Component {
     this.state = {
       blogs: [],   
       error: null,
+      success: null,
       newBlog: null,
       username: '',
       password: '',
@@ -58,7 +59,10 @@ class App extends React.Component {
   }
 
   logout = async (event) => {
+    event.preventDefault()
     window.localStorage.removeItem('loggedBlogappUser')
+    this.setState({ username: '', password: '', user: null })
+    console.log('logout metodia kutsuttu')
   }
 
   login = async (event) => {
@@ -98,7 +102,7 @@ class App extends React.Component {
     )
 
     const logoutForm = () => (
-      <Togglable buttonLabel="logout" ref={component => this.logoutForm = component}>
+      <Togglable buttonLabel="logout">
       <LogoutForm
           visible={this.state.visible}
           handleSubmit={this.logout}
@@ -119,14 +123,13 @@ class App extends React.Component {
     return (
       <div>
         <h2>blogs</h2>
-
+        <Notification message={this.state.success}/>
         <Notification message={this.state.error}/>
 
         {this.state.user === null ?
           loginForm() :
           <div>
-            <p>{this.state.user.name} logged in</p>
-            {logoutForm()}
+            {this.state.user.name} logged in <button onClick={this.logout}>logout</button>
             {blogForm()}
           </div>
         }

@@ -1,13 +1,9 @@
 import React from 'react'
 
-const LogoutForm = ({ handleSubmit, handleChange }) => {
+const LogoutForm = ({ handleSubmit }) => {
   return (
     <div>
-      <h2>Kirjaudu</h2>
-
-      <form onSubmit={handleSubmit}>
-        <button type="submit">log out</button>
-      </form>
+        <button onClick={handleSubmit}>log out</button>
     </div>
   )
 }
