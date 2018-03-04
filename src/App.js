@@ -2,6 +2,7 @@ import React from 'react'
 import Blog from './components/Blog'
 import Notification from './components/Notification'
 import LoginForm from './components/LoginForm'
+import LogoutForm from './components/LogoutForm'
 import BlogForm from './components/BlogForm.js'
 import Togglable from './components/Togglable'
 import blogService from './services/blogs'
@@ -56,6 +57,10 @@ class App extends React.Component {
     this.setState({ [event.target.name]: event.target.value })
   }
 
+  logout = async (event) => {
+    window.localStorage.removeItem('loggedBlogappUser')
+  }
+
   login = async (event) => {
     event.preventDefault()
     try {
@@ -92,6 +97,15 @@ class App extends React.Component {
       </Togglable>
     )
 
+    const logoutForm = () => (
+      <Togglable buttonLabel="logout" ref={component => this.logoutForm = component}>
+      <LogoutForm
+          visible={this.state.visible}
+          handleSubmit={this.logout}
+      />
+      </Togglable>
+    )
+
     const blogForm = () => (
       <Togglable buttonLabel="new blog" ref={component => this.blogForm = component}>
         <BlogForm
@@ -112,6 +126,7 @@ class App extends React.Component {
           loginForm() :
           <div>
             <p>{this.state.user.name} logged in</p>
+            {logoutForm()}
             {blogForm()}
           </div>
         }
