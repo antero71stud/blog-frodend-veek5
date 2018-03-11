@@ -1,68 +1,97 @@
 import React from 'react'
 import Blog from './components/Blog'
+import BlogForm from './components/BlogForm'
 import Notification from './components/Notification'
-import LoginForm from './components/LoginForm'
-import LogoutForm from './components/LogoutForm'
-import BlogForm from './components/BlogForm.js'
 import Togglable from './components/Togglable'
 import blogService from './services/blogs'
 import loginService from './services/login'
-
 
 class App extends React.Component {
   constructor(props) {
     super(props)
     this.state = {
-      blogs: [],   
-      error: null,
-      success: null,
-      newBlog: null,
+      blogs: [],
+      user: null,
       username: '',
-      password: '',
-      user: null
+      password: '', 
+      title: '',
+      author: '',
+      url: '',
+      notification: null
     }
   }
 
-  componentDidMount() {
-    blogService
-    .getAll()
-    .then(blogs => {
+  componentWillMount() {
+    blogService.getAll().then(blogs =>
       this.setState({ blogs })
-    })
-    
-    const loggedUserJSON = window.localStorage.getItem('loggedBlogappUser')
+    )
+    const loggedUserJSON = window.localStorage.getItem('loggedBlogAppUser')
     if (loggedUserJSON) {
       const user = JSON.parse(loggedUserJSON)
       this.setState({ user })
       blogService.setToken(user.token)
-    } 
+    }
+  } 
+
+  notify = (message, type = 'info') => {
+    this.setState({
+      notification: {
+        message, type
+      }
+    })
+    setTimeout(() => {
+      this.setState({
+        notification: null
+      })     
+    }, 10000)
   }
 
-  addBlog = (event) => {
-    event.preventDefault()
-    const blogObject = {
-      blogs: this.state.newBlog
+  like = (id) => async () => {
+    const liked = this.state.blogs.find(b=>b._id===id)
+    const updated = { ...liked, likes: liked.likes + 1 }
+    await blogService.update(id, updated)
+    this.notify(`you liked '${updated.title}' by ${updated.author}`)
+    this.setState({
+      blogs: this.state.blogs.map(b => b._id === id ? updated : b)
+    })
+  }
+
+  remove = (id) => async () => {
+    const deleted = this.state.blogs.find(b => b._id === id)
+    const ok = window.confirm(`remove blog '${deleted.title}' by ${deleted.author}?`)
+    if ( ok===false) {
+      return
     }
 
-    blogService
-      .create(blogObject)
-      .then(newBlog => {
-        this.setState({
-          blogs: this.state.blogs.concat(newBlog),
-          newBlog: ''
-        })
-      })
+    await blogService.remove(id)
+    this.notify(`blog '${deleted.title}' by ${deleted.author} removed`)
+    this.setState({
+      blogs: this.state.blogs.filter(b=>b._id!==id)
+    })
   }
 
-  handleLoginFieldChange = (event) => {
-    this.setState({ [event.target.name]: event.target.value })
-  }
-
-  logout = async (event) => {
+  addBlog = async (event) => {
     event.preventDefault()
-    window.localStorage.removeItem('loggedBlogappUser')
-    this.setState({ username: '', password: '', user: null })
-    console.log('logout metodia kutsuttu')
+    const blog = {
+      title: this.state.title,
+      author: this.state.author,
+      url: this.state.url,
+    }
+    
+    const result = await blogService.create(blog) 
+    this.notify(`blog '${blog.title}' by ${blog.author} added`)
+    this.setState({ 
+      title: '', 
+      url: '', 
+      author: '',
+      blogs: this.state.blogs.concat(result)
+    })
+  }
+
+  logout = () => {
+    window.localStorage.removeItem('loggedBlogAppUser')
+    this.notify('logged out')
+    this.setState({ user: null })
   }
 
   login = async (event) => {
@@ -73,69 +102,82 @@ class App extends React.Component {
         password: this.state.password
       })
 
-      window.localStorage.setItem('loggedBlogappUser', JSON.stringify(user))
+      window.localStorage.setItem('loggedBlogAppUser', JSON.stringify(user))
       blogService.setToken(user.token)
+      this.notify('welcome back!')
       this.setState({ username: '', password: '', user })
     } catch (exception) {
-      this.setState({
-        error: 'käyttäjätunnus tai salasana virheellinen',
-      })
+      this.notify('käyttäjätunnus tai salasana virheellinen', 'error')
       setTimeout(() => {
         this.setState({ error: null })
       }, 5000)
     }
   }
 
+  handleLoginChange = (event) => {
+    this.setState({ [event.target.name]: event.target.value })
+  }
 
   render() {
+    if (this.state.user === null) {
+      return (
+        <div>
+          <Notification notification={this.state.notification} />
+          <h2>Kirjaudu sovellukseen</h2>
+          <form onSubmit={this.login}>
+            <div>
+              käyttäjätunnus
+              <input
+                type="text"
+                name="username"
+                value={this.state.username}
+                onChange={this.handleLoginChange}
+              />
+            </div>
+            <div>
+              salasana
+              <input
+                type="password"
+                name="password"
+                value={this.state.password}
+                onChange={this.handleLoginChange}
+              />
+            </div>
+            <button type="submit">kirjaudu</button>
+          </form>
+        </div>
+      )
+    }
 
-    const loginForm = () => (
-      <Togglable buttonLabel="login">
-        <LoginForm
-          visible={this.state.visible}
-          username={this.state.username}
-          password={this.state.password}
-          handleChange={this.handleLoginFieldChange}
-          handleSubmit={this.login}
-        />
-      </Togglable>
-    )
+    const byLikes = (b1, b2) => b2.likes - b1.likes
 
-    const logoutForm = () => (
-      <Togglable buttonLabel="logout">
-      <LogoutForm
-          visible={this.state.visible}
-          handleSubmit={this.logout}
-      />
-      </Togglable>
-    )
-
-    const blogForm = () => (
-      <Togglable buttonLabel="new blog" ref={component => this.blogForm = component}>
-        <BlogForm
-          onSubmit={this.addBlog}
-          value={this.state.newBlog}
-          handleChange={this.handleBlogChange}
-        />
-      </Togglable>
-    )
+    const blogsInOrder = this.state.blogs.sort(byLikes)
 
     return (
       <div>
+        <Notification notification={this.state.notification} />
+
+        {this.state.user.name} logged in <button onClick={this.logout}>logout</button>
+
+        <Togglable buttonLabel='uusi blogi'>
+          <BlogForm 
+            handleChange={this.handleLoginChange}
+            title={this.state.title}
+            author={this.state.author}
+            url={this.state.url}
+            handleSubmit={this.addBlog}
+          />
+        </Togglable>
+
         <h2>blogs</h2>
-        <Notification message={this.state.success}/>
-        <Notification message={this.state.error}/>
-
-        {this.state.user === null ?
-          loginForm() :
-          <div>
-            {this.state.user.name} logged in <button onClick={this.logout}>logout</button>
-            {blogForm()}
-          </div>
-        }
-
-        {this.state.blogs.map(blog => 
-          <Blog key={blog._id} blog={blog}/>
+        {blogsInOrder.map(blog => 
+          <Blog 
+            key={blog._id} 
+            blog={blog} 
+            like={this.like(blog._id)}
+            remove={this.remove(blog._id)}
+            deletable={blog.user === undefined || blog.user.username === this.state.user.username}
+          />
         )}
       </div>
     );
